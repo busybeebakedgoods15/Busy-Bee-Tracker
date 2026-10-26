@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7ead6"><link rel="manifest" href="./manifest.webmanifest">
+<title>Busy Bee Baked Goods — Market Tracker</title>
+<style>
+:root{--ink:#3d352d;--muted:#75695d;--cream:#fffaf1;--card:#fff;--line:#eadfce;--accent:#c98b45;--accent2:#f3dfbd;--danger:#b85c4a;--good:#5e8b65}
+*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+header{padding:14px 18px;background:#f7ead6;border-bottom:1px solid var(--line)}.brand{display:flex;align-items:center;gap:14px;max-width:950px;margin:auto}.brand img{width:76px;height:76px;object-fit:contain;border-radius:12px;background:#fff}h1{margin:0;font-size:25px}header p{margin:4px 0 0;color:var(--muted)}
+nav{display:flex;gap:7px;overflow:auto;padding:10px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+nav button{border:0;background:#f5efe7;padding:10px 13px;border-radius:20px;color:var(--ink);white-space:nowrap;font-weight:600}
+nav button.active{background:var(--accent);color:#fff}
+main{max-width:950px;margin:auto;padding:16px}.view{display:none}.view.active{display:block}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:15px;box-shadow:0 2px 8px #6b54301a}.stat{font-size:28px;font-weight:750}.label{font-size:13px;color:var(--muted)}
+h2{font-size:20px;margin:8px 0 14px}h3{margin:0 0 8px}
+button,.btn{cursor:pointer}.primary{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:11px 15px;font-weight:700}.secondary{background:#f4ecdf;border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:10px 13px;font-weight:650}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.list{display:grid;gap:10px}.row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}th{background:#faf3e8}
+input,select{width:100%;padding:10px;border:1px solid #d9cbb8;border-radius:9px;background:#fff;color:var(--ink)}label{font-size:13px;color:var(--muted);display:block;margin:9px 0 4px}.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.badge{display:inline-block;padding:4px 8px;border-radius:99px;background:var(--accent2);font-size:12px}.good{background:#dfeee1;color:#38633e}.warn{background:#f5dfd8;color:#8b4437}
+.empty{padding:28px;text-align:center;color:var(--muted)}small{color:var(--muted)}
+.modal{position:fixed;inset:0;background:#0008;display:none;align-items:flex-end;justify-content:center;z-index:20}.modal.open{display:flex}.sheet{background:#fffaf4;width:min(700px,100%);border-radius:20px 20px 0 0;padding:18px;max-height:90vh;overflow:auto}
+.itemline{display:grid;grid-template-columns:1fr 90px;gap:8px;align-items:center;margin:8px 0}.right{text-align:right}.danger{color:var(--danger);border-color:#e6c5bc}
+@media(min-width:700px){.modal{align-items:center}.sheet{border-radius:18px}}
+</style>
+</head>
+<body>
+<header><div class="brand"><img src="busy-bee-logo.png" alt="Busy Bee Baked Goods logo"><div><h1>Busy Bee Baked Goods</h1><p>Market, consignment & future farm-stand tracker</p></div></div></header>
+<nav id="nav"></nav>
+<main>
+<section id="dashboard" class="view active"></section>
+<section id="products" class="view"></section>
+<section id="locations" class="view"></section>
+<section id="events" class="view"></section>
+<section id="reports" class="view"></section>
+</main>
+<div id="modal" class="modal"><div class="sheet" id="sheet"></div></div>
+<script>
+const KEY="busyBeeTrackerV1";
+let db=JSON.parse(localStorage.getItem(KEY)||'null')||{
+ products:[
+  {id:"p1",name:"Chocolate Chip Cookie",category:"Large Cookies",price:4,cost:1},
+  {id:"p2",name:"Apple Pie Cookie",category:"Large Cookies",price:4,cost:1.1},
+  {id:"p3",name:"Carrot Cake",category:"Mini Cakes",price:5,cost:1.75}
+ ],
+ locations:[
+  {id:"l1",name:"Rexburg Farmer's Market",type:"Market"},
+  {id:"l2",name:"B Street Sidewalk Sales",type:"Market"},
+  {id:"l3",name:"Consignment Store",type:"Consignment"},
+  {id:"l4",name:"Busy Bee Farmer's Stand",type:"Farm Stand"}
+ ],
+ stock:{},
+ events:[],
+ sales:[]
+};
+db.products.forEach(p=>{if(!p.category)p.category="Other";});
+function save(){localStorage.setItem(KEY,JSON.stringify(db))}
+function id(){return Math.random().toString(36).slice(2,9)}
+function money(n){return "$"+Number(n||0).toFixed(2)}
+function prod(id){return db.products.find(x=>x.id===id)}
+function loc(id){return db.locations.find(x=>x.id===id)}
+function stockAt(pid,lid){return Number(db.stock[pid+"|"+lid]||0)}
+function setStock(pid,lid,n){db.stock[pid+"|"+lid]=Math.max(0,Number(n)||0)}
+function totalStock(pid){return db.locations.reduce((s,l)=>s+stockAt(pid,l.id),0)}
+function renderNav(){
+ const items=[["dashboard","Dashboard"],["products","Products"],["locations","Locations"],["events","Markets & Sales"],["reports","Reports"]];
+ nav.innerHTML=items.map(x=>`<button data-v="${x[0]}">${x[1]}</button>`).join("");
+ nav.querySelectorAll("button").forEach(b=>b.onclick=()=>show(b.dataset.v));
+}
+function show(v){document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));document.getElementById(v).classList.add("active");nav.querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===v));render(v)}
+function render(v){({dashboard:renderDash,products:renderProducts,locations:renderLocations,events:renderEvents,reports:renderReports}[v])()}
+function renderDash(){
+ const revenue=db.sales.reduce((s,x)=>s+x.qty*x.price,0), sold=db.sales.reduce((s,x)=>s+x.qty,0), inventory=db.products.reduce((s,p)=>s+totalStock(p.id),0);
+ dashboard.innerHTML=`<h2>Dashboard</h2><div class="grid">
+ <div class="card"><div class="stat">${money(revenue)}</div><div class="label">Recorded revenue</div></div>
+ <div class="card"><div class="stat">${sold}</div><div class="label">Items sold</div></div>
+ <div class="card"><div class="stat">${inventory}</div><div class="label">Items currently out / stocked</div></div>
+ <div class="card"><div class="stat">${db.events.length}</div><div class="label">Markets & sales events</div></div></div>
+ <div class="actions"><button class="primary" onclick="openEvent()">+ New Market / Event</button><button class="secondary" onclick="show('locations')">Restock a Location</button></div>
+ <div class="card"><h3>Inventory by location</h3>${db.locations.map(l=>`<div class="row"><span>${l.name}<br><small>${l.type}</small></span><b>${db.products.reduce((s,p)=>s+stockAt(p.id,l.id),0)} items</b></div>`).join("")}</div>`;
+}
+function renderProducts(){
+ const sortedProducts=[...db.products].sort((a,b)=>(a.category||"Other").localeCompare(b.category||"Other")||a.name.localeCompare(b.name));
+ products.innerHTML=`<h2>Products</h2><div class="actions"><button class="primary" onclick="openProduct()">+ Add Product</button></div>
+ <div class="list">${sortedProducts.map(p=>`<div class="card"><div class="row"><div><h3>${p.name}</h3><span class="badge">${p.category||"Other"}</span> <span class="badge">${money(p.price)}</span> <small>cost ${money(p.cost)}</small></div><b>${totalStock(p.id)} total</b></div>
+ <div class="row"><span>Inventory by location</span><span></span></div>${db.locations.map(l=>`<div class="row"><span>${l.name}</span><span><b>${stockAt(p.id,l.id)}</b> <button class="secondary" onclick="adjust('${p.id}','${l.id}')">Adjust</button></span></div>`).join("")}
+ <div class="actions"><button class="secondary danger" onclick="deleteProduct('${p.id}')">Delete</button></div></div>`).join("")}</div>`;
+}
+function renderLocations(){
+ locations.innerHTML=`<h2>Locations</h2><div class="actions"><button class="primary" onclick="openLocation()">+ Add Location</button></div>
+ <div class="list">${db.locations.map(l=>{let qty=db.products.reduce((s,p)=>s+stockAt(p.id,l.id),0);return `<div class="card"><h3>${l.name}</h3><span class="badge">${l.type}</span><div class="stat">${qty}</div><small>items currently here</small><div class="actions"><button class="secondary" onclick="restock('${l.id}')">Restock / Adjust</button></div>${[...db.products].sort((a,b)=>(a.category||"Other").localeCompare(b.category||"Other")||a.name.localeCompare(b.name)).map(p=>`<div class="row"><span>${p.name}<br><small>${p.category||"Other"}</small></span><span><b>${stockAt(p.id,l.id)}</b> <button class="secondary" onclick="adjust('${p.id}','${l.id}')">Sold / Adjust</button></span></div>`).join("")}</div>`}).join("")}</div>`;
+}
+function renderEvents(){
+ events.innerHTML=`<h2>Markets & Sales</h2><div class="actions"><button class="primary" onclick="openEvent()">+ New Event</button></div>
+ ${db.events.length?`<div class="list">${[...db.events].reverse().map(e=>`<div class="card"><div class="row"><div><h3>${e.name}</h3><small>${e.date} · ${loc(e.locationId)?.name||""}</small></div><b>${money(e.revenue)}</b></div>
+ <div class="row"><span>Items brought: ${e.brought.reduce((s,x)=>s+x.qty,0)}</span><span>Sold: ${e.brought.reduce((s,x)=>s+x.sold,0)}</span><span>Returned: ${e.brought.reduce((s,x)=>s+x.qty-x.sold,0)}</span></div>
+ <button class="secondary" onclick="editEvent('${e.id}')">View / Edit</button></div>`).join("")}</div>`:`<div class="card empty">No events yet. Create your first market above.</div>`}`;
+}
+function renderReports(){
+ let rows=db.products.map(p=>{let sold=db.sales.filter(s=>s.productId===p.id).reduce((a,s)=>a+s.qty,0), rev=db.sales.filter(s=>s.productId===p.id).reduce((a,s)=>a+s.qty*s.price,0);return {p,sold,rev}});
+ reports.innerHTML=`<h2>Reports</h2><div class="card"><h3>Product performance</h3><table><tr><th>Product</th><th>Sold</th><th>Revenue</th><th>On hand</th></tr>${rows.map(r=>`<tr><td>${r.p.name}</td><td>${r.sold}</td><td>${money(r.rev)}</td><td>${totalStock(r.p.id)}</td></tr>`).join("")}</table></div>
+ <div class="card" style="margin-top:12px"><h3>Location performance</h3><table><tr><th>Location</th><th>Units</th><th>Revenue</th></tr>${db.locations.map(l=>{let ss=db.sales.filter(s=>s.locationId===l.id),q=ss.reduce((a,s)=>a+s.qty,0),r=ss.reduce((a,s)=>a+s.qty*s.price,0);return `<tr><td>${l.name}</td><td>${q}</td><td>${money(r)}</td></tr>`}).join("")}</table></div>
+ <div class="card" style="margin-top:12px"><h3>Monthly sales</h3><table><tr><th>Month</th><th>Location</th><th>Units</th><th>Revenue</th></tr>${[...new Set(db.sales.map(s=>(s.date||"").slice(0,7)+"|"+s.locationId))].sort().map(k=>{let [month,lid]=k.split("|"),ss=db.sales.filter(s=>(s.date||"").slice(0,7)===month&&s.locationId===lid);return `<tr><td>${month||"Unknown"}</td><td>${loc(lid)?.name||"Unknown"}</td><td>${ss.reduce((a,s)=>a+s.qty,0)}</td><td>${money(ss.reduce((a,s)=>a+s.qty*s.price,0))}</td></tr>`}).join("")}</table></div>
+ <div class="card" style="margin-top:12px"><h3>Sales by event</h3><table><tr><th>Event</th><th>Date</th><th>Location</th><th>Units</th><th>Revenue</th></tr>${db.events.map(e=>{let ss=db.sales.filter(s=>s.eventId===e.id);return `<tr><td>${e.name}</td><td>${e.date}</td><td>${loc(e.locationId)?.name||""}</td><td>${ss.reduce((a,s)=>a+s.qty,0)}</td><td>${money(ss.reduce((a,s)=>a+s.qty*s.price,0))}</td></tr>`}).join("")}</table></div>
+ <div class="card" style="margin-top:12px"><h3>Backup</h3><button class="secondary" onclick="downloadData()">Export data</button> <button class="secondary" onclick="document.getElementById('importFile').click()">Import data</button><input id="importFile" type="file" accept=".json" style="display:none" onchange="importData(event)"><p><small>Your data is stored in this browser. Export a backup regularly.</small></p></div>`;
+}
+function modal(content){sheet.innerHTML=content;modalEl.classList.add("open")}
+const modalEl=document.getElementById("modal"); modalEl.onclick=e=>{if(e.target===modalEl)modalEl.classList.remove("open")};
+function closeM(){modalEl.classList.remove("open")}
+function openProduct(){modal(`<h2>Add Product</h2><label>Product name<input id="pn"></label><label>Product type / category<select id="pcat"><option>Large Cookies</option><option>Cookie Bags</option><option>Mini Cakes</option><option>Cakes</option><option>Brownies</option><option>Bars</option><option>Cupcakes</option><option>Other</option></select></label><label>Selling price<input id="pp" type="number" step=".01"></label><label>Cost to make (optional)<input id="pc" type="number" step=".01"></label><div class="actions"><button class="primary" onclick="addProduct()">Save</button><button class="secondary" onclick="closeM()">Cancel</button></div>`)}
+function addProduct(){let name=pn.value.trim();if(!name)return alert("Enter a product name.");db.products.push({id:id(),name,category:pcat.value,price:+pp.value||0,cost:+pc.value||0});save();closeM();renderProducts()}
+function deleteProduct(pid){if(confirm("Delete this product?")){db.products=db.products.filter(p=>p.id!==pid);Object.keys(db.stock).filter(k=>k.startsWith(pid+"|")).forEach(k=>delete db.stock[k]);save();renderProducts()}}
+function openLocation(){modal(`<h2>Add Location</h2><label>Name<input id="ln"></label><label>Type<select id="lt"><option>Market</option><option>Consignment</option><option>Farm Stand</option><option>Other</option></select></label><div class="actions"><button class="primary" onclick="addLocation()">Save</button><button class="secondary" onclick="closeM()">Cancel</button></div>`)}
+function addLocation(){let name=ln.value.trim();if(!name)return;db.locations.push({id:id(),name,type:lt.value});save();closeM();renderLocations()}
+function adjust(pid,lid){let p=prod(pid),l=loc(lid);modal(`<h2>Inventory: ${p.name}</h2><p>${l.name} · On hand: <b>${stockAt(pid,lid)}</b></p><label>Action<select id="invAction" onchange="toggleSoldFields()"><option value="sold">Sold</option><option value="adjust">Set inventory count</option></select></label><div id="soldFields"><label>Quantity sold<input id="soldQty" type="number" min="1" max="${stockAt(pid,lid)}" value="1"></label><label>Date sold<input id="soldDate" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label>Event / market (optional)<select id="soldEvent"><option value="">No specific event</option>${db.events.filter(e=>e.locationId===lid).map(e=>`<option value="${e.id}">${e.name} · ${e.date}</option>`).join("")}</select></label></div><div id="adjustFields" style="display:none"><label>New quantity on hand<input id="aq" type="number" min="0" value="${stockAt(pid,lid)}"></label></div><div class="actions"><button class="primary" onclick="saveInventoryAction('${pid}','${lid}')">Save</button><button class="secondary" onclick="closeM()">Cancel</button></div>`)}
+function toggleSoldFields(){let sold=document.getElementById("invAction").value==="sold";document.getElementById("soldFields").style.display=sold?"block":"none";document.getElementById("adjustFields").style.display=sold?"none":"block"}
+function saveInventoryAction(pid,lid){if(invAction.value==="adjust"){setStock(pid,lid,aq.value)}else{let q=Math.floor(Number(soldQty.value)||0);if(q<1)return alert("Enter a quantity greater than zero.");if(q>stockAt(pid,lid))return alert("You can't sell more than the quantity currently on hand at this location.");let p=prod(pid),eventId=soldEvent.value||"";setStock(pid,lid,stockAt(pid,lid)-q);db.sales.push({id:id(),date:soldDate.value||new Date().toISOString().slice(0,10),locationId:lid,productId:pid,qty:q,price:Number(p.price)||0,eventId:eventId,source:"manual"});if(eventId){let e=db.events.find(x=>x.id===eventId);if(e){e.revenue=(e.revenue||0)+q*(Number(p.price)||0)}}}save();closeM();renderProducts();renderLocations();renderDash()}
+function restock(lid){modal(`<h2>Inventory at ${loc(lid).name}</h2>${db.products.map(p=>`<div class="itemline"><span>${p.name}</span><input id="st_${p.id}" type="number" min="0" value="${stockAt(p.id,lid)}"></div>`).join("")}<div class="actions"><button class="primary" onclick="saveRestock('${lid}')">Save</button><button class="secondary" onclick="closeM()">Cancel</button></div>`)}
+function saveRestock(lid){db.products.forEach(p=>setStock(p.id,lid,document.getElementById("st_"+p.id).value));save();closeM();renderLocations()}
+function openEvent(existing=null){let e=existing?db.events.find(x=>x.id===existing):null;modal(`<h2>${e?"Edit":"New"} Market / Event</h2><div class="formgrid"><div><label>Event name<input id="en" value="${e?.name||""}"></label></div><div><label>Date<input id="ed" type="date" value="${e?.date||new Date().toISOString().slice(0,10)}"></label></div><div><label>Location<select id="el">${db.locations.map(l=>`<option value="${l.id}" ${e?.locationId===l.id?"selected":""}>${l.name}</option>`).join("")}</select></label></div></div><h3>Products brought</h3><div id="eventItems">${(e?.brought||[]).map((x,i)=>eventLine(x,i)).join("")}</div><button class="secondary" onclick="addEventLine()">+ Product</button><div class="actions"><button class="primary" onclick="saveEvent('${e?.id||""}')">Save Event</button><button class="secondary" onclick="closeM()">Cancel</button></div>`);if(!e)addEventLine()}
+function eventLine(x={},i){return `<div class="itemline" data-line="${i}"><select class="ep">${db.products.map(p=>`<option value="${p.id}" ${x.productId===p.id?"selected":""}>${p.name}</option>`).join("")}</select><input class="eq" type="number" min="0" value="${x.qty||1}" placeholder="Brought"></div>`}
+function addEventLine(){let box=document.getElementById("eventItems");box.insertAdjacentHTML("beforeend",eventLine({},box.children.length))}
+function saveEvent(existingId){let name=en.value.trim();if(!name)return alert("Enter an event name.");let lines=[...document.querySelectorAll("#eventItems .itemline")].map(r=>({productId:r.querySelector(".ep").value,qty:+r.querySelector(".eq").value||0,sold:0})).filter(x=>x.qty>0);let e=existingId?db.events.find(x=>x.id===existingId):{id:id()};e.name=name;e.date=ed.value;e.locationId=el.value;e.brought=lines;e.revenue=0;if(!existingId)db.events.push(e);else{e.revenue=lines.reduce((s,x)=>s+x.sold*(prod(x.productId)?.price||0),0)}save();closeM();renderEvents()}
+function editEvent(eid){let e=db.events.find(x=>x.id===eid);modal(`<h2>${e.name}</h2><p>${e.date} · ${loc(e.locationId)?.name||""}</p><table><tr><th>Product</th><th>Brought</th><th>Sold</th><th>Returned</th></tr>${e.brought.map((x,i)=>`<tr><td>${prod(x.productId)?.name||"Deleted"}</td><td>${x.qty}</td><td><input style="width:70px" id="sold_${i}" type="number" min="0" max="${x.qty}" value="${x.sold||0}"></td><td>${x.qty-(x.sold||0)}</td></tr>`).join("")}</table><div class="actions"><button class="primary" onclick="finishEvent('${eid}')">Save Sales</button><button class="secondary" onclick="closeM()">Close</button></div>`)}
+function finishEvent(eid){let e=db.events.find(x=>x.id===eid);db.sales=db.sales.filter(s=>s.eventId!==eid);e.revenue=0;e.brought.forEach((x,i)=>{let sold=Math.min(x.qty,Math.max(0,+document.getElementById("sold_"+i).value||0));x.sold=sold;let p=prod(x.productId);e.revenue+=sold*(p?.price||0);db.sales.push({id:id(),eventId:eid,date:e.date,locationId:e.locationId,productId:x.productId,qty:sold,price:p?.price||0});let home=db.locations.find(l=>l.name.toLowerCase().includes("home"));if(home){setStock(x.productId,home.id,stockAt(x.productId,home.id)+x.qty-sold)}});save();closeM();renderEvents()}
+function downloadData(){let a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:"application/json"}));a.download="busy-bee-backup.json";a.click()}
+function importData(ev){let f=ev.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{db=JSON.parse(r.result);save();location.reload()}catch(e){alert("That backup could not be read.")}};r.readAsText(f)}
+renderNav();show("dashboard");
+</script>
+<footer style="max-width:950px;margin:auto;padding:8px 16px 24px"><small>Busy Bee Tracker · Updated October 2026. Sales reduce the selected location’s stock. Export a backup regularly.</small></footer><script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));}</script></body></html>

@@ -1,0 +1,17 @@
+{
+  "name": "Busy Bee Baked Goods Tracker",
+  "short_name": "Busy Bee",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fffaf1",
+  "theme_color": "#f7ead6",
+  "icons": [
+    {
+      "src": "busy-bee-logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
